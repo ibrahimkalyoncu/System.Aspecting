@@ -11,5 +11,7 @@ namespace System.Aspecting
         public object[] Arguments { get; set; }
         public MethodInfo MethodInfo { get; set; }
         public object Result { get; set; }
+        public bool Canceled { get; set; }
+        public Exception Exception { get; set; }
     }
 }

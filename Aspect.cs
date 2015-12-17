@@ -25,8 +25,89 @@ namespace System.Aspecting
 
         public U Invoke<U>(Expression<Func<T, U>> expression)
         {
-            var methodCall = expression.Body as MethodCallExpression;
-            var aspectCall = new AspectCall();
+            AspectCall aspectCall = PreInvoke(expression);
+
+            IEnumerable<AspectMethodAttribute> methodCallAttributes = aspectCall.MethodInfo.GetCustomAttributes(typeof(AspectMethodAttribute)) as IEnumerable<AspectMethodAttribute>;
+
+            foreach (var attr in methodCallAttributes)
+            {
+                attr.OnExecuting(aspectCall);
+
+                if (aspectCall.Exception != null)
+                    throw aspectCall.Exception;
+
+                if (aspectCall.Canceled)
+                    return default(U);
+
+                if (aspectCall.Result != null)
+                    break;
+            }
+
+            if (aspectCall.Result == null)
+                try
+                {
+                    aspectCall.Result = expression.Compile().Invoke(_instance);
+                }
+                catch (Exception exception)
+                {
+                    foreach (var attr in methodCallAttributes)
+                    {
+                        attr.OnException(aspectCall, exception);
+
+                        if (aspectCall.Exception != null)
+                            throw aspectCall.Exception;
+
+                        if (aspectCall.Canceled)
+                            return default(U);
+                    }
+                }
+
+            foreach (var attr in methodCallAttributes)
+                attr.OnExecuted(aspectCall);
+
+            return (U)aspectCall.Result;
+        }
+
+        public void Invoke(Expression<Action<T>> expression)
+        {
+            AspectCall aspectCall = PreInvoke(expression);
+
+            IEnumerable<AspectMethodAttribute> methodCallAttributes = aspectCall.MethodInfo.GetCustomAttributes(typeof(AspectMethodAttribute)) as IEnumerable<AspectMethodAttribute>;
+
+            foreach (var attr in methodCallAttributes)
+            {
+                attr.OnExecuting(aspectCall);
+
+                if (aspectCall.Canceled)
+                    return;
+            }
+
+            try
+            {
+                expression.Compile().Invoke(_instance);
+            }
+            catch (Exception exception)
+            {
+                foreach (var attr in methodCallAttributes)
+                {
+                    attr.OnException(aspectCall, exception);
+
+                    if (aspectCall.Exception != null)
+                        throw aspectCall.Exception;
+
+                    if (aspectCall.Canceled)
+                        return;
+                }
+            }
+
+            foreach (var attr in methodCallAttributes)
+                attr.OnExecuted(aspectCall);
+        }
+
+        private AspectCall PreInvoke(LambdaExpression expression)
+        {
+            MethodCallExpression methodCall = expression.Body as MethodCallExpression;
+            AspectCall aspectCall = new AspectCall();
 
             if (methodCall == null)
                 throw new InvalidOperationException("Expression has to be a method call.");
@@ -43,23 +124,7 @@ namespace System.Aspecting
                 aspectCall.Arguments[methodCall.Arguments.IndexOf(argument)] = value;
             }
 
-            IEnumerable<AspectMethodAttribute> methodCallAttributes = aspectCall.MethodInfo.GetCustomAttributes(typeof(AspectMethodAttribute)) as IEnumerable<AspectMethodAttribute>;
-
-            foreach (var attr in methodCallAttributes)
-            {
-                attr.OnExecuting(aspectCall);
-
-                if (aspectCall.Result != null)
-                    break;
-            }
-
-            if (aspectCall.Result == null)
-                aspectCall.Result = expression.Compile().Invoke(_instance);
-
-            foreach (var attr in methodCallAttributes)
-                attr.OnExecuted(aspectCall);
-
-            return (U)aspectCall.Result;
+            return aspectCall;
         }
     }
 }

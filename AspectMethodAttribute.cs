@@ -1,9 +1,10 @@
 ﻿namespace System.Aspecting
 {
     [AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]
-    public abstract class AspectMethodAttribute : Attribute
+    public class AspectMethodAttribute : Attribute
     {
-        public abstract void OnExecuting(AspectCall call);
-        public abstract void OnExecuted(AspectCall call);
+        public virtual void OnExecuting(AspectCall call) { }
+        public virtual void OnExecuted(AspectCall call) { }
+        public virtual void OnException(AspectCall call, Exception exception) { }
     }
 }
